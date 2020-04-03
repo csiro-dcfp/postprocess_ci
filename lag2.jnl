@@ -1,0 +1,28 @@
+can data/all
+can var/all
+
+!use indices.$1.$3.1.nc
+!changed to member 2 because some of member 1 are too small
+use indices.$1.$3.002.nc
+! obs
+DEFINE AXIS/T=14-jan-1854:14-jan-2018:`365.25/12`/UNITS=days/cal=julian tmid
+use "../obs.indices.nc"
+let a=$2[d=2,gt=tmid@asn]
+
+! not used 
+!da product
+DEFINE AXIS/T=1-feb-2002:30-jun-2016:1/UNITS=days/cal=noleap t2
+!use "../nino_obs"
+!let b=$2[d=3,gt=t2@nrst]
+
+let m1= $2[d=1]
+let ob=m1*0 + a[gt=$2[d=1]] 
+!let da=m1*0+ b[gt=$2[d=1]] 
+
+!save/clob/file=$1.$2.tmp.nc ob,da
+save/clob/file=$1.$3.$2.tmp.nc ob
+exit
+
+list/t=1-jan-2005:15-jan-2005 $2[d=3]
+list/l=1:10 ob,da,da1,da2 !,b,c,d
+

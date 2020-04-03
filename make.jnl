@@ -1,0 +1,19 @@
+
+set mode meta
+set win/asp=1.3
+def sym ind  nino3p4
+def sym ind  nino4
+def sym ind  nino3
+
+go play23 2005 ($ind)
+go play23 2006 ($ind)
+go play23 2007 ($ind)
+go play23 2008 ($ind)
+go play23 2009 ($ind)
+go play23 2010 ($ind)
+go play23 2011 ($ind)
+go play23 2012 ($ind)
+go play23 2013 ($ind)
+go play23 2014 ($ind)
+go play23 2015 ($ind)
+go play23 2016 ($ind)

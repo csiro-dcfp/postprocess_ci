@@ -1,0 +1,9 @@
+
+can data/all
+can var/all
+can reg/all
+use odaily.$1.des
+
+
+go indices.raw.jnl 
+sp mv indices.nc indices/indices.$2.$3.$1.nc 

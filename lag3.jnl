@@ -1,0 +1,21 @@
+can data/all
+can var/all
+
+! obs
+DEFINE AXIS/T=14-jan-1854:14-jan-2018:`365.25/12`/UNITS=days/cal=julian tmid
+use nino_obs.v4.nc
+let a=$2[d=1,gt=tmid@asn]
+
+!da product
+!DEFINE AXIS/T=1-feb-2002:30-jun-2016:1/UNITS=days/cal=noleap t2
+use nino_obs
+let b=$2[d=2]
+let c=$2[d=2,gt=t2@lin]
+let d=$2[d=2,gt=t2@asn]
+
+let m1= b
+let ob=m1*0 + a[gt=m1] 
+let da=m1*0+ b[gt=m1] 
+
+save/clob/file=obs.$2.2002.nc ob,da
+

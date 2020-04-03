@@ -1,0 +1,79 @@
+
+!use odaily.$1.des
+
+cancel mode upcase_output 
+let temp=sst
+
+!==========================================
+! Indian Ocean Dipole
+! compute IOD index from the observed sst based on the DMI definition
+! Saji+Yamagata 2003
+
+ def sym regw "y=-10:10@ave,x=60:80@ave"
+ def sym rege "y=-10:0@ave,x=90:110@ave"
+ let ssta = temp[d=1,k=1]
+ let tw = ssta[($regw)]
+ let te = ssta[($rege)]
+ let/title="IOD index" iod = tw - te
+save/file=indices.nc/clob iod
+
+!==========================================
+! NINO indexes
+!from  https://climatedataguide.ucar.edu/climate-data/nino-sst-indices-nino-12-3-34-4-oni-and-tni
+!---------------------------------------------------------
+ cancel reg
+ set reg/y=-5:5/x=150W:90W  ! nino3
+ let n3     = temp[k=1,y=@ave,x=@ave]
+ save/file=indices.nc/app n3
+
+!---------------------------------------------------------
+ cancel reg
+ set reg/y=-5:5/x=170W:120W  ! nino3.4
+ let n34    = temp[k=1,y=@ave,x=@ave]
+ save/file=indices.nc/app n34
+let temp=sst
+
+!---------------------------------------------------------
+ cancel reg
+ set reg/y=0:-10/x=90W:80W  ! nino1.2
+ let n12    = temp[k=1,y=@ave,x=@ave]
+ save/file=indices.nc/app n12
+
+!---------------------------------------------------------
+ cancel reg
+ set reg/y=5N:5S/x=160E:150W !nino4
+ let n4     = temp[k=1,y=@ave,x=@ave]
+ save/file=indices.nc/app n4
+
+!!==========================================
+!! SAM
+!
+! cancel reg
+! let slp_65s = slp[d=1,y=65S,x=@ave]
+! let slp_40s = slp[d=1,y=40S,x=@ave]
+!
+! set memory/size=5000
+! let sam   = ((slp_40s - sclim40[gt=slp[d=1]])/std40r[gt=slp[d=1]]) - ((slp_65s - sclim65[gt=slp[d=1]])/std65r[gt=slp[d=1]])
+! save/file=indices_($exp1).nc/app sam
+
+!==========================================
+! PDO
+
+!==========================================
+! IPOTPI
+ cancel reg
+ let p1     = temp[k=1,y=25N:45N@ave,x=140E:145W@ave]
+ let p2     = temp[k=1,y=10S:10N@ave,x=170E:90W@ave]
+ let p3     = temp[k=1,y=50S:15S@ave,x=150E:160W@ave]
+ let ipotpi = p2 - ( (p1 + p3) / 2 )
+ save/file=indices.nc/app p1
+ save/file=indices.nc/app p2
+ save/file=indices.nc/app p3
+ save/file=indices.nc/app ipotpi
+
+!T coral sea
+ let t_coral= sst[k=1,x=142:166@ave,y=-18:-10@ave]
+ save/file=indices.nc/app t_coral
+
+sp mv indices.nc junk/indices.$2.$1.nc 
+!save/clob/file=nino.$2.$1.nc nino3,nino3p4,nino4

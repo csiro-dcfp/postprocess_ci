@@ -1,0 +1,16 @@
+set mem/size=300 
+can data/all
+can var/all
+
+use msst.$1.nc
+! obs
+DEFINE AXIS/T=14-jan-1854:14-jan-2018:`365.25/12`/UNITS=days/cal=julian tmid
+use "/g/data1a/v14/observations/sst/sst.mnmean.v4.nc"
+
+let m1= sst[d=1]
+let a=sst[d=2,gt=tmid@asn,gxy=m1]
+
+let ob=m1*0 + a[gt=m1] 
+
+save/clob/file=data.$2.$1.nc ob
+
