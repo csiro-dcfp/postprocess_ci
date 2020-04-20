@@ -1,0 +1,364 @@
+#!/usr/bin/perl
+# Creates a Ferret descriptor from a list of NetCDF files.
+#
+# Author: Andrew Wittenberg
+# Version dated 7 April 2004
+
+use Getopt::Long;
+
+# extract command-line options
+GetOptions(
+   "f77" => \$opt_f77,
+   "dmget" => \$opt_dmget,
+   "modulo" => \$opt_modulo,
+   "nodods" => \$opt_nodods,
+   "prefix=s" => \$opt_prefix,
+   "suffix=s" => \$opt_suffix,
+   "title=s" => \$opt_title,
+   "help" => \$opt_help
+   );
+
+# defaults for Boolean options
+$opt_dmget = 0 unless defined($opt_dmget);
+$opt_f77 = 0 unless defined($opt_f77);
+$opt_modulo = 0 unless defined($opt_modulo);
+$opt_nodods = 0 unless defined($opt_nodods);
+$opt_help = 0 unless defined($opt_help);
+
+# a help message
+if ($opt_help) {
+   print <<END_of_Multiline_Text;
+NAME
+   make_des - create a Ferret descriptor from a list of NetCDF files
+
+SYNOPSIS
+   make_des [--dmget] [--f77] [--help] [--modulo] [--nodods]
+      [--prefix=string] [--suffix=string] [--title="TITLE"] ncfile[s]
+
+DESCRIPTION
+   Create a Ferret descriptor from a list of NetCDF files and
+   send it to the standard output.
+
+   --dmget  Issue a single dmget of all files before building descriptor.
+            Greatly improves efficiency when the files are offline.
+
+   --f77    Fortran-77 format (for pre-v5.4x non-Linux Ferret).
+
+   --help   Display this help and exit
+
+   --modulo Add a modulo attribute to the descriptor time axis.
+
+   --nodods Disallow access to DODS URLs.  Improves performance.
+
+   --prefix=string
+            Prepend the given string to each input filename.
+
+   --suffix=string
+            Append the given string to each input filename.
+
+   --title="Title"
+            Specify the title attribute of the descriptor;
+            otherwise it is extracted from the first netCDF file.
+
+NOTES
+   (1) Each input filename should include the full path to the file;
+   otherwise the descriptor will not work outside the directory where
+   it was created.
+
+   (2) The input files may be in any order, but all must have the
+   same name for the time dimension, and time coordinates must not
+   overlap between files.
+
+   (3) DODS URLs may be used in addition to NetCDF files,
+   if the "ncdump" or "dncdump" utility is DODS-enabled.
+
+   (4) In Ferret, use the "file.des" WITHOUT its extension:
+      yes? use file
+
+   (5) Due to an inherent limitation of Ferret descriptors, time
+   coordinates for each NetCDF file will have a uniform increment of
+
+      dt = (ncfile_end_time-ncfile_start_time) / (num_points-1)
+
+   so a file containing monthly-means will typically appear
+   to have uniform 30.4-day months.  This can be corrected in
+   Ferret by regridding variables to a new time axis, e.g.:
+
+      yes? define axis/t t_axis_new = correct_time_values
+      yes? let var_new = var[gt=t_axis_new\@asn]
+
+EXAMPLES
+   Basic usage:
+      make_des file1.nc file2.nc file3.nc > file.des
+
+   Wildcards are OK if the shell can expand them:
+      make_des file*.nc > file.des
+      make_des file[1-3].nc > file.des
+      make_des file[123].nc > file.des
+      make_des file{1,2,3}.nc > file.des
+   or use the prefix/suffix options:
+      make_des --prefix=file --suffix=.nc 1 2 3 > file.des
+
+   And if "ncdump" is DODS-enabled, one can link URLs, e.g. for
+   sea level pressure 1980-1982:
+      make_des --prefix=http://www...\/slp.198 --suffix=.nc 0 1 2 > file.des
+
+SEE ALSO
+   dmget_des, des2nc
+
+AUTHOR
+   Inspired by the Python script "mkdes" by Benyang Tang.
+   Perl version by Andrew Wittenberg.
+
+END_of_Multiline_Text
+   exit 1;
+   }
+
+# usage message if no file arguments
+if ($#ARGV < 0) {
+   print "Usage: make_des [--dmget] [--f77] [--help] [--modulo] [--nodods] [--prefix=string] [--suffix=string] [--title=\"TITLE\"] ncfile[s] > file.des\n";
+   print "Creates a Ferret descriptor from a list of NetCDF files.\n";
+   exit 1;
+   }
+
+# assign record delimiters
+if ($opt_f77) {
+   $record_start = " \$";
+   $record_end = " \$END";
+   }
+else {
+   $record_start = "&";
+   $record_end = "/";
+   }
+
+# assign the prefix
+if ($opt_prefix) {
+   $prefix = $opt_prefix;
+   }
+else {
+   $prefix = "";
+   }
+
+# assign the suffix
+if ($opt_suffix) {
+   $suffix = $opt_suffix;
+   }
+else {
+   $suffix = "";
+   }
+
+if ($opt_dmget) {
+   $file_list = "@ARGV";
+   $file_list =~ tr/ /,/;
+   die "ERROR in make_des: could not dmget files.\n" if (`dmget $prefix\{$file_list\}$suffix`);
+   }
+
+# define and verify the ncdump command
+if (not $opt_nodods and system("dncdump") == 0) {
+   $ncdump = "dncdump";
+   }
+else {
+   $ncdump = "ncdump";
+   }
+die "ERROR in make_des: utility '$ncdump' does not exist on this platform.\n" unless system("$ncdump") == 0;
+
+# connect to the header of the first NetCDF file
+open(NCHEADER,"$ncdump -c $prefix$ARGV[0]$suffix |") or die "ERROR in make_des: could not open input data $prefix$ARGV[0]$suffix\n";
+
+while (defined($_ = <NCHEADER>) and not defined($time_axis_name)) {
+   # get the name of the time dimension, and the number of time levels
+   if (s/\s*(\w+) = UNLIMITED.*\((\d+) currently\).*\n/\1 \2/) {
+      ($time_axis_name,$ntime) = split;
+      }
+   }
+
+while (defined($_ = <NCHEADER>) and ($_ ne "data:\n")) {
+   # get the time axis units and zero-date
+   if (s/\s*$time_axis_name:units = "(.*)\ssince\s(.*)".*\n/\1 \2/) {
+      ($time_units,$t0_ymd,$t0_hms) = split;
+      }
+   # get the calendar type
+   if (s/\s*$time_axis_name:calendar_type = "(.*)".*\n/\1/) {
+      $time_calendar = $_;
+      }
+   if (s/\s*$time_axis_name:calendar = "(.*)".*\n/\1/) {
+      $time_calendar = $_;
+      }
+
+   # get the dataset title if not specified on command line
+   if (defined($opt_title)) {
+      $dset_title = $opt_title;
+      }
+   else {
+      if (s/\s*:title = "(.*)".*\n/\1/) {
+         $dset_title = $_;
+         }
+      }
+   }
+
+# supply defaults if necessary
+if (not defined($time_units)) {$time_units = "MONTHS"}
+if (not defined($t0_ymd)) {$t0_ymd = "0000-01-01"}
+if (not defined($t0_hms)) {$t0_hms = "00:00:00"}
+if (not defined($time_calendar)) {$time_calendar = "GREGORIAN"}
+
+# disconnect from the header
+close(NCHEADER);
+
+# Create a hash that gives the average number of seconds
+# per time unit (by the Gregorian calendar).
+%to_seconds = qw(
+   second         1
+   minute        60
+   hour        3600
+   day        86400
+   month    2629746
+   year    31556952
+   );
+
+# translate time units to lowercase, and make singular
+$time_units =~ tr/A-Z/a-z/;
+$time_units =~ s/(\w+)s/\1/;
+
+# compute the number of seconds per time unit
+$num_seconds = $to_seconds{$time_units};
+
+# Create a hash to translate month numbers.
+%month_names = qw(
+    1 JAN
+    2 FEB
+    3 MAR
+    4 APR
+    5 MAY
+    6 JUN
+    7 JUL
+    8 AUG
+    9 SEP
+   10 OCT
+   11 NOV
+   12 DEC
+   );
+
+# extract date components
+($t0_yr,$t0_mon,$t0_day) = split("-",$t0_ymd);
+
+# convert month string to a number
+$t0_mon += 0;
+
+# construct the descriptor T0 date string
+$zero_date_des = "$t0_day-$month_names{$t0_mon}-$t0_yr";
+
+# write the header info
+print "${record_start}FORMAT_RECORD\n";
+print "   D_TYPE             = '  MC'\n";
+print "   D_FORMAT           = '  1A'\n";
+print "${record_end}\n\n";
+print "${record_start}BACKGROUND_RECORD\n";
+print "   D_TITLE            = '$dset_title'\n";
+print "   D_T0TIME           = '$zero_date_des:$t0_hms'\n";
+print "   D_TIME_UNIT        = $num_seconds\n";
+if ($opt_modulo) {
+   print "   D_TIME_MODULO      = .TRUE.\n";
+   }
+else {
+   print "   D_TIME_MODULO      = .FALSE.\n";
+   }
+if (not $opt_f77) {
+   print "   D_CALTYPE          = '$time_calendar'\n";
+   }
+print "${record_end}\n\n";
+print "${record_start}MESSAGE_RECORD\n";
+print "   D_MESSAGE          = ' '\n";
+print "   D_ALERT_ON_OPEN    = .FALSE.\n";
+print "   D_ALERT_ON_OUTPUT  = .FALSE.\n";
+print "${record_end}\n\n";
+print "${record_start}EXTRA_RECORD\n";
+print "${record_end}\n\n";
+
+foreach $filename(@ARGV) {
+   # reset the input record separator
+   $/ = "\n";
+
+   # connect to the header of the NetCDF file
+   open(NCHEADER,"$ncdump -c -v $time_axis_name $prefix$filename$suffix |");
+
+   # get the name of the time dimension, and the number of time levels
+   undef $ntime;
+   while (defined($_ = <NCHEADER>) and not defined($ntime)) {
+      if (s/\s*(\w+) = UNLIMITED.*\((\d+) currently\).*\n/\1 \2/) {
+         ($time_axis_name,$ntime) = split;
+         }
+      }
+
+   # read up to the data section
+   while (defined($_ = <NCHEADER>) and ($_ ne "data:\n")) {}
+
+   # change the input record separator
+   $/ = ";";
+
+   undef $time_start;
+   undef $time_end;
+   while (defined($_ = <NCHEADER>) and not defined($time_start)) {
+      @fields = split;
+      if ($fields[0] eq $time_axis_name) {
+         if ($#fields >= 3) {
+            # two or more time coordinates
+            ($time_start, $time_end) = ($fields[2], $fields[$#fields-1]);
+            $time_start =~ s/,//;   #strip out the trailing comma
+            }
+         elsif ($#fields >= 2) {
+            # single time coordinate
+            ($time_start, $time_end) = (s/$fields[2]//, $fields[2]);
+            };
+         }
+      }
+
+   # disconnect from the header
+   close(NCHEADER);
+
+   # insert file info into a hash keyed by start time
+   $file{$time_start} = [$filename, $time_end, $ntime];
+   }
+
+undef $time_end_prev;
+
+# output the file info in order of increasing start time
+for $time_start (sort {$a<=>$b} keys(%file)) {
+   $filename = $file{$time_start}[0];
+   $time_end = $file{$time_start}[1];
+   $ntime    = $file{$time_start}[2];
+
+   # ensure that current start time is greater than previous end time
+   if (defined($time_end_prev) and $time_start <= $time_end_prev) {
+      print "ERROR in make_des: start time ($time_start) in file '$prefix$filename$suffix' ";
+      print "precedes end time ($time_end_prev) in file '$prefix$filename_prev$suffix'\n";
+      exit 1;
+      }
+
+   # compute the average timestep
+   if ($ntime > 1) {
+      $time_delta = ($time_end - $time_start) / ($ntime - 1);
+      }
+   else {
+      $time_delta = 1;
+      }
+
+   # write the info for this file
+   print "${record_start}STEPFILE_RECORD\n";
+   print "   S_FILENAME         = '$prefix$filename$suffix'\n";
+   print "   S_AUX_SET_NUM      = 0\n";
+   print "   S_START            = $time_start\n";
+   print "   S_END              = $time_end\n";
+   print "   S_DELTA            = $time_delta\n";
+   print "   S_NUM_OF_FILES     = 1\n";
+   print "   S_REGVARFLAG       = ' '\n";
+   print "${record_end}\n\n";
+
+   $filename_prev = $filename;
+   $time_end_prev = $time_end;
+   }
+
+print "${record_start}STEPFILE_RECORD\n";
+print "   S_FILENAME         = '**END OF STEPFILES**'\n";
+print "${record_end}\n";
+
