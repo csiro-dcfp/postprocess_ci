@@ -1,16 +1,30 @@
-# scripts to build the files for the ENSO verification analysis
-# from matt
-#rsync /short/v19/mtc599/ao_am2/sep17b/work2/indices.collate.nc . 
+#!/bin/bash -l 
 
-# From DA run
-#cp /short/v14/tok599/coupled/ao_am2/coupled_da/workdir2/OUTPUT-2step-nobreeding-carbon2/temp_inc_januarys_2002-2016.nc .
-#cp /short/v14/tok599/coupled/ao_am2/coupled_da/workdir2/OUTPUT-2step-nobreeding-carbon2/temp_inc_timevg_januarys_2002-2016.nc .
-# builds files of 
-# ensemble mean and members 
-# observed values on model grid
+# scripts to build the climate indices files for verification analysis
+# plot an ensmble of forecasts for a give initial start time
+# include the observation index on the plot
 
-# builds climate indices
-./indices_1.sh 
-# combine climate indices into one file
-./indices_2.sh  
+conda activate ferret
+conda env list
+
+cd postprocess_ci
+mkdir indices
+mkdir tmp
+
+year=1982
+year=$1  # pass to script at command line
+
+# builds climate indices for 
+# forecast ensemble members 
+# observed values on the same time axis as forecasts
+./indices_1.sh ${year} 
+
+# produce plot of the climate indices
+conda activate notebook
+python climate_indices.py ${year}
+
+mkdir plots
+# move plot to a common directory
+mv ${year}_*.pdf plots
+
 

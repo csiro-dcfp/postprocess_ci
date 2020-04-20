@@ -48,7 +48,7 @@ print(year)
 # In[3]:
 
 
-
+# pre-computed dataset for removing the mean fields from the forecasts and observations
 model = xr.open_mfdataset('indices/model.11.lag.nc',combine='by_coords')
 
 data=xr.open_dataset('indices/data.11.lag.nc')
@@ -65,8 +65,8 @@ var=['iod','ipotpi','n12','t_coral','n34','n4']
 
 def plot_xx(l):
     ax=plt.subplot(3,2,l)
-    file='indices/'+year+'.11.fix.nc'
-    dfile='indices/'+year+'.11.lag.nc'
+    file='indices/'+year+'.11.fcst.nc'
+    dfile='indices/'+year+'.11.obs.nc'
     fcst=xr.open_dataset(file)
     obs=xr.open_dataset(dfile)
 

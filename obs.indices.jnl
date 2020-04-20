@@ -4,7 +4,7 @@ can view
 can data/all
 can var/all
 
-use "/g/data/v14/observations/sst/sst.mnmean.v4.nc"
+use "obs/sst.mnmean.v4.nc"
 
 go indices.raw.jnl
 

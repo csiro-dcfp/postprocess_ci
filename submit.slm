@@ -1,4 +1,4 @@
 
 
 #singularity exec -C -B /group/pawsey0315/matear:/home/matear /scratch/pawsey0315/matear/jupyter-dir/pangeo-mac_mod2.sif  bash -l
-singularity exec -C -B /group/pawsey0315/matear:/home/matear /scratch/pawsey0315/matear/jupyter-dir/pangeo-mac_mod2.sif ~/postprocess_ci/make_data.sh 
+singularity exec -C -B /group/pawsey0315/matear:/home/matear /scratch/pawsey0315/matear/jupyter-dir/pangeo-mac_mod2.sif ~/postprocess_ci/make_CI.sh 2017 
